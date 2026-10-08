@@ -1,0 +1,26 @@
+services:
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:14   # version fixée : la v15 a changé la configuration
+    container_name: wg-easy
+    restart: unless-stopped
+    environment:
+      - WG_HOST=192.168.129.200          # IP locale (remplacer par IP publique / DNS pour un accès externe)
+      # Hash bcrypt du mot de passe (généré avec la commande "wgpw", voir README).
+      # Chaque "$" du hash doit être doublé en "$$".
+      - PASSWORD_HASH=REMPLACER_PAR_LE_HASH_AVEC_$$_DOUBLES
+      - WG_PORT=51820
+      # Règles de pare-feu en iptables-nft (le noyau du Pi 5 n'a plus les modules iptables "legacy").
+      # "eth0" = interface DANS le conteneur, pas celle du Pi.
+      - "WG_POST_UP=iptables-nft -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables-nft -A INPUT -p udp -m udp --dport 51820 -j ACCEPT; iptables-nft -A FORWARD -i wg0 -j ACCEPT; iptables-nft -A FORWARD -o wg0 -j ACCEPT;"
+      - "WG_POST_DOWN=iptables-nft -t nat -D POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE; iptables-nft -D INPUT -p udp -m udp --dport 51820 -j ACCEPT; iptables-nft -D FORWARD -i wg0 -j ACCEPT; iptables-nft -D FORWARD -o wg0 -j ACCEPT;"
+    volumes:
+      - ./wg-data:/etc/wireguard
+    ports:
+      - "51820:51820/udp"   # tunnel WireGuard
+      - "51821:51821/tcp"   # interface web d'administration (ne jamais l'exposer sur Internet)
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1

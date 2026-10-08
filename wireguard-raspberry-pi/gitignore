@@ -1,0 +1,4 @@
+# Ne jamais publier les clés et configurations des clients VPN
+wg-data/
+.env
+*.bak
